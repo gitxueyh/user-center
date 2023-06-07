@@ -76,9 +76,9 @@ public class User implements Serializable {
     private Integer isDelete;
 
     /**
-     * 用户角色 0 - 普通用户 1 - 管理员 2 - VIP
+     * 用户角色 user - 普通用户 admin - 管理员
      */
-    private Integer userRole;
+    private String userRole;
 
     /**
      * 星球编号

@@ -17,7 +17,7 @@
             <result property="createTime" column="create_time" jdbcType="TIMESTAMP"/>
             <result property="updateTime" column="update_time" jdbcType="TIMESTAMP"/>
             <result property="isDelete" column="is_delete" jdbcType="TINYINT"/>
-            <result property="userRole" column="user_role" jdbcType="TINYINT"/>
+            <result property="userRole" column="user_role" jdbcType="VARCHAR"/>
             <result property="planetCode" column="planet_code" jdbcType="VARCHAR"/>
     </resultMap>
 

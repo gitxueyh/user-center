@@ -1,5 +1,6 @@
 package com.xzh.usercenter.controller;
 
+import com.xzh.usercenter.annotation.AuthCheck;
 import com.xzh.usercenter.common.BaseResponse;
 import com.xzh.usercenter.common.ErrorCode;
 import com.xzh.usercenter.common.ResultUtils;
@@ -15,10 +16,8 @@ import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
 import java.util.List;
-import java.util.stream.Collectors;
 
-import static com.xzh.usercenter.constant.UserConstant.ADMIN_ROLE;
-import static com.xzh.usercenter.constant.UserConstant.USER_LOGIN_STATUS;
+import static com.xzh.usercenter.constant.UserConstant.*;
 
 
 /**
@@ -74,37 +73,23 @@ public class UserController {
     }
 
     @GetMapping("/current")
-    public BaseResponse<User> getCurrentUser(HttpSession session) {
-        Object userObj = session.getAttribute(USER_LOGIN_STATUS);
-        User currentUser = (User) userObj;
-        if (currentUser == null) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR);
-        }
-        Long userId = currentUser.getId();
-        // TODO 校验用户是否合法
-        User user = userService.getById(userId);
-        User safetyUser = userService.getSafetyUser(user);
-        return ResultUtils.success(safetyUser);
+    public BaseResponse<User> getCurrentUser(HttpServletRequest request) {
+        User currentUser = userService.getCurrentUser(request);
+        return ResultUtils.success(currentUser);
     }
 
     @GetMapping("/search")
-    public BaseResponse<List<User>> searchUsers(String username, HttpSession session) {
-        // 仅管理员可查
-        if (!isAdmin(session)) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR);
-        }
-        List<User> users = userService.searchUsers(username);
-        //脱敏
-        List<User> userList = users.stream().map(user -> userService.getSafetyUser(user)).collect(Collectors.toList());
+    @AuthCheck(mustRole = ADMIN_ROLE)
+    // 仅管理员可查
+    public BaseResponse<List<User>> searchUsers(String username) {
+        List<User> userList = userService.searchUsers(username);
         return ResultUtils.success(userList);
     }
 
     @PostMapping("/delete")
-    public BaseResponse<Boolean> searchUsers(@RequestBody long id, HttpSession session) {
-        // 仅管理员可删除
-        if (!isAdmin(session)) {
-            throw new BusinessException(ErrorCode.NO_AUTH);
-        }
+    @AuthCheck(mustRole = ADMIN_ROLE)
+    // 仅管理员可删除
+    public BaseResponse<Boolean> searchUsers(@RequestBody long id) {
         // id不合法
         if (id <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
@@ -112,19 +97,5 @@ public class UserController {
         Boolean b = userService.removeById(id);
         return ResultUtils.success(b);
     }
-
-    /**
-     * 是否为管理员
-     *
-     * @param session
-     * @return
-     */
-    private boolean isAdmin(HttpSession session) {
-        // 仅管理员可查
-        Object userObj = session.getAttribute(USER_LOGIN_STATUS);
-        User user = (User) userObj;
-        return user != null && user.getUserRole() == ADMIN_ROLE;
-    }
-
 
 }

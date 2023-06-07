@@ -3,12 +3,15 @@ package com.xzh.usercenter.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.xzh.usercenter.common.ErrorCode;
+import com.xzh.usercenter.constant.UserConstant;
 import com.xzh.usercenter.exception.BusinessException;
 import com.xzh.usercenter.model.domain.User;
 import com.xzh.usercenter.service.UserService;
 import com.xzh.usercenter.mapper.UserMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 
@@ -17,7 +20,9 @@ import javax.servlet.http.HttpSession;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
+import static com.xzh.usercenter.common.ErrorCode.NOT_LOGIN;
 import static com.xzh.usercenter.constant.UserConstant.USER_LOGIN_STATUS;
 
 /**
@@ -34,6 +39,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
      */
     private static final String SALT = "Xueyuehua";
 
+    @Autowired
+    private StringRedisTemplate stringRedisTemplate;
 
     @Override
     public long userRegister(String userAccount, String userPassword, String checkPassword, String planetCode) {
@@ -63,40 +70,40 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         if (!userPassword.equals(checkPassword)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "密码输入不一致");
         }
-        // 账户不能重复
-        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("user_account", userAccount);
-        long count = this.count(queryWrapper);
-        if (count > 0) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "账号重复");
-        }
+        synchronized (userAccount.intern()) {
+            // 账户不能重复
+            QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+            queryWrapper.eq("user_account", userAccount);
+            long count = this.count(queryWrapper);
+            if (count > 0) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "账号重复");
+            }
 
-        // 星球编号不能重复
-        queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("planet_code", userAccount);
-        count = this.count(queryWrapper);
-        if (count > 0) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "编号重复");
+            // 星球编号不能重复
+            queryWrapper = new QueryWrapper<>();
+            queryWrapper.eq("planet_code", userAccount);
+            count = this.count(queryWrapper);
+            if (count > 0) {
+                throw new BusinessException(ErrorCode.PARAMS_ERROR, "编号重复");
+            }
+            // 2. 加密
+            String encryptPassword = DigestUtils.md5DigestAsHex((SALT + userPassword).getBytes());
+            // 3. 插入数据
+            User user = new User();
+            user.setUserAccount(userAccount);
+            user.setUserPassword(encryptPassword);
+            user.setPlanetCode(planetCode);
+            boolean saveResult = this.save(user);
+            // 保存失败
+            if (!saveResult) {
+                throw new BusinessException(ErrorCode.SYSTEM_ERROR, "注册失败，数据库错误");
+            }
+            return user.getId();
         }
-        // 2. 加密
-        String encryptPassword = DigestUtils.md5DigestAsHex((SALT + userPassword).getBytes());
-        // 3. 插入数据
-        User user = new User();
-        user.setUserAccount(userAccount);
-        user.setUserPassword(encryptPassword);
-        user.setPlanetCode(planetCode);
-        boolean saveResult = this.save(user);
-        // 保存失败
-        if (!saveResult) {
-            return -1;
-        }
-
-        return user.getId();
     }
 
     @Override
     public User userLogin(String userAccount, String userPassword, HttpServletRequest request) {
-
         // 1. 校验
         // 账户、密码不能为空
         if (StringUtils.isAnyBlank(userAccount, userPassword)) {
@@ -134,8 +141,23 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         User safetyUser = getSafetyUser(user);
         // 4. 记录用户的登录态
         request.getSession().setAttribute(USER_LOGIN_STATUS, safetyUser);
-
         return safetyUser;
+    }
+
+    /**
+     * 获取当前登录用户
+     *
+     * @param request
+     * @return
+     */
+    @Override
+    public User getCurrentUser(HttpServletRequest request) {
+        // 先判断是否已登录
+        User currentUser = (User) request.getSession().getAttribute(USER_LOGIN_STATUS);;
+        if (currentUser == null || currentUser.getId() == null) {
+            throw new BusinessException(NOT_LOGIN);
+        }
+        return this.getSafetyUser(currentUser);
     }
 
     @Override
@@ -144,7 +166,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         if (StringUtils.isNotBlank(username)) {
             queryWrapper.like("username", username);
         }
-        return this.list(queryWrapper);
+        List<User> users = this.list(queryWrapper);
+        //脱敏
+        return users.stream().map(this::getSafetyUser).collect(Collectors.toList());
     }
 
 

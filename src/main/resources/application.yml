@@ -1,14 +1,22 @@
 spring:
   application:
-    name: customer-center
+    name: user-center
+  # MySQL 配置
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/user
     username: root
     password: a123
-  # session 失效时间
+  # Session 失效时间
   session:
     timeout: 86400
+    store-type: redis
+  # Redis 配置
+  redis:
+    port: 6379
+    host: 114.55.232.73
+    database: 5
+    password: qweqwe123
 server:
   port: 8080
   servlet:

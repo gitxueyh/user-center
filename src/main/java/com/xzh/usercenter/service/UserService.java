@@ -34,6 +34,14 @@ public interface UserService extends IService<User> {
      */
     User userLogin(String userAccount, String userPassword, HttpServletRequest request);
 
+    /**
+     * 获取当前登录用户
+     *
+     * @param request
+     * @return
+     */
+    User getCurrentUser(HttpServletRequest request);
+
     List<User> searchUsers(String username);
 
     /**
