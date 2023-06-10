@@ -2,6 +2,8 @@ package com.xzh.usercenter.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.xzh.usercenter.model.domain.User;
+import com.xzh.usercenter.model.request.UserAddRequest;
+import com.xzh.usercenter.model.request.UserModifyPasswordRequest;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
@@ -59,4 +61,19 @@ public interface UserService extends IService<User> {
    * @return
    */
   int userLogout(HttpSession session);
+
+    /**
+     * 添加新用户
+     * @param addUser
+     * @return
+     */
+
+    int addUser(UserAddRequest addUser);
+
+    /**
+     * 校验密码是否一致
+     * @param request
+     * @return
+     */
+    boolean checkPassword(UserModifyPasswordRequest passwordRequest, HttpServletRequest request);
 }

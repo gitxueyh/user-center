@@ -3,18 +3,20 @@ package com.xzh.usercenter.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.xzh.usercenter.common.ErrorCode;
-import com.xzh.usercenter.constant.UserConstant;
 import com.xzh.usercenter.exception.BusinessException;
-import com.xzh.usercenter.model.domain.User;
-import com.xzh.usercenter.service.UserService;
 import com.xzh.usercenter.mapper.UserMapper;
+import com.xzh.usercenter.model.domain.User;
+import com.xzh.usercenter.model.request.UserAddRequest;
+import com.xzh.usercenter.model.request.UserModifyPasswordRequest;
+import com.xzh.usercenter.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 
+import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
 import java.util.List;
@@ -39,7 +41,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
      */
     private static final String SALT = "Xueyuehua";
 
-    @Autowired
+    @Resource
+    private UserMapper userMapper;
+
+    @Resource
     private StringRedisTemplate stringRedisTemplate;
 
     @Override
@@ -158,6 +163,41 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             throw new BusinessException(NOT_LOGIN);
         }
         return this.getSafetyUser(currentUser);
+    }
+
+    /**
+     * 新增用户
+     * @param addUser
+     * @return
+     */
+    @Override
+    public int addUser(UserAddRequest addUser) {
+        User user = new User();
+        BeanUtils.copyProperties(addUser,user);
+        String userPassword=addUser.getUserPassword();
+        String encryptPassword = DigestUtils.md5DigestAsHex((SALT + userPassword).getBytes());
+        user.setUserPassword(encryptPassword);
+        return userMapper.insert(user);
+    }
+
+    @Override
+    public boolean checkPassword(UserModifyPasswordRequest passwordRequest, HttpServletRequest request) {
+        String password = passwordRequest.getPassword();
+        //获取用户输入的密码的加密状态
+        String userPassword = DigestUtils.md5DigestAsHex((SALT +password).getBytes());
+        //获取当前用户
+        User currentUser = getCurrentUser(request);
+        String checkPassword = currentUser.getUserPassword();
+
+        if(userPassword.equals(checkPassword)){
+            String newPassword = passwordRequest.getNewPassword();
+            String newPassword1 = DigestUtils.md5DigestAsHex((SALT +newPassword).getBytes());
+            currentUser.setUserPassword(newPassword1);
+            this.updateById(currentUser);
+            return true;
+        } else {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"输入密码有误");
+        }
     }
 
     @Override

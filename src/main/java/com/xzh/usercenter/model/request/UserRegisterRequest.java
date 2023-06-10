@@ -10,7 +10,9 @@ import java.io.Serializable;
  * @author xzh
  */
 @Data
-public class UserRegisterRequest{
+public class UserRegisterRequest implements Serializable{
+
+    private static final long serialVersionUID = -8213695363324810987L;
 
     private String userAccount;
 
